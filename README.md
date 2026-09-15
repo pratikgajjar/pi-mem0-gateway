@@ -1,0 +1,94 @@
+# pi-mem0-gateway
+
+Call **Linear, Notion, PostHog, and Sentry** from [pi](https://github.com/badlogic/pi-mono) through the [mem0 gateway](https://mem0.ai). The gateway holds the credentials, so pi never asks you to log in to a connector and no API key for those services is stored on your machine.
+
+```
+mem0_gateway(operation: "find", task: "list linear teams")
+mem0_gateway(operation: "invoke", tool_name: "linear__list_teams", arguments: { limit: 3 })
+```
+
+## Why one tool
+
+pi ships no MCP client [by design](https://mariozechner.at/posts/2025-11-02-what-if-you-dont-need-mcp/): tool definitions are verbose, and a connected server costs context on every turn whether you use it or not.
+
+The mem0 gateway is already a meta-gateway — five verbs in front of a catalogue of 90+ connector tools. This extension registers **one** tool with those five operations, so the context cost stays flat as your org grants more tools. The model queries the catalogue on demand instead of carrying it.
+
+## Install
+
+```bash
+pi install npm:pi-mem0-gateway
+```
+
+Then set your gateway key:
+
+```bash
+export MEM0_GATEWAY_TOKEN="mg_..."
+```
+
+Restart pi. Ask it for anything in Linear, Notion, PostHog, or Sentry.
+
+## Operations
+
+| Operation | Purpose | Key fields |
+|---|---|---|
+| `discover` | Full inventory of connectors and tools | — |
+| `find` | Search granted tools for a task | `task`, `requestable` |
+| `describe` | Input schema of one tool | `tool_name` |
+| `invoke` | Call a granted tool | `tool_name`, `arguments` |
+| `request` | Ask an admin for access | `tool_names`, `reason` |
+
+The normal path is `find` → `describe` → `invoke`. Use `discover` when you want the whole catalogue.
+
+An empty `find` result is a **confirmed no-match**, not an error. When the granted search is empty, search again with `requestable: true`, then `request` what helps.
+
+## Configuration
+
+The key is read from `MEM0_GATEWAY_TOKEN`, then `MEM0_GATEWAY_API_KEY`, then pi settings.
+
+```jsonc
+// ~/.pi/agent/settings.json
+{
+  "pi-mem0-gateway": {
+    "token": "${MEM0_GATEWAY_TOKEN}",  // ${VAR} is expanded
+    "url": "https://gateway-mcp.mem0.ai/mcp",
+    "timeoutMs": 60000
+  }
+}
+```
+
+| Setting | Environment variable | Default |
+|---|---|---|
+| `token` | `MEM0_GATEWAY_TOKEN`, `MEM0_GATEWAY_API_KEY` | none — required |
+| `url` | `MEM0_GATEWAY_URL` | `https://gateway-mcp.mem0.ai/mcp` |
+| `timeoutMs` | `MEM0_GATEWAY_TIMEOUT_MS` | `60000` |
+
+### Project settings cannot supply a key
+
+`token` and `url` are read from the environment and from **global** settings only. A project-local `.pi/settings.json` is checked into a repository, so honouring a token or a URL from there would let a cloned repository redirect every gateway call, key and all. A project may set `timeoutMs`, which cannot leak a credential.
+
+## Errors
+
+Each failure returns readable text, never a stack trace. The model can act on all of them.
+
+| Message | Meaning |
+|---|---|
+| `(config)` | No key, or malformed arguments |
+| `(transport)` | Gateway unreachable, timed out, or the key was rejected |
+| `(tool)` | The gateway or the connector refused the call |
+| `denied ... (out_of_scope)` | You lack access. Use `find` with `requestable`, then `request` |
+| `upstream_401` | The connector needs a reconnect in the mem0 admin console. Your key is fine |
+
+An access request is asynchronous and can take hours. Report it as pending and do not poll.
+
+## Development
+
+```bash
+npm install
+npm run check   # tsc --noEmit, then node --test
+```
+
+`src/client.ts` is a ~100 line MCP Streamable HTTP client. The gateway is stateless — no `initialize` handshake, no session id — so an SDK is not needed. Responses are parsed as JSON or as SSE `data:` frames, because the endpoint may use either.
+
+## License
+
+MIT

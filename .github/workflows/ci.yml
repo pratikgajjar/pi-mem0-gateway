@@ -1,0 +1,23 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - run: npm ci
+
+      # Typecheck, then the tests. Every test is offline: the gateway is
+      # never called from CI, so no key is needed and no run can be flaky
+      # because a connector is down.
+      - run: npm run check

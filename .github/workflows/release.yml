@@ -1,0 +1,39 @@
+name: release
+
+# Creates the GitHub release for a v* tag. npm publishing lives in
+# publish-npm.yml, because npm's OIDC trusted publisher is bound to that
+# workflow file. Both run from the same tag push, so a release is one command:
+#   git tag v0.1.1 && git push origin v0.1.1
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to release, for example v0.1.0"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # release notes are generated from the full history
+
+      # Re-running a tag must stay green, so an existing release is left alone.
+      - run: |
+          set -euo pipefail
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "release $TAG already exists; nothing to do."
+          else
+            gh release create "$TAG" --title "$TAG" --generate-notes --verify-tag
+          fi

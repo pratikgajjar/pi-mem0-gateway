@@ -1,0 +1,50 @@
+name: publish-npm
+
+# Publishes pi-mem0-gateway to npm on release tags. Kept as a separate workflow
+# named publish-npm.yml because npm's Trusted Publisher (OIDC) for the package
+# is bound to this workflow file — publishing from any other workflow fails
+# auth. No NPM_TOKEN; OIDC only.
+#
+# npm cannot create a package through OIDC, so version 0.1.0 was published once
+# from a laptop. Every later tag goes through here.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # required by npm OIDC trusted publishing
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+
+      # OIDC Trusted Publishing requires npm >= 11.5.1.
+      - run: npm install -g npm@latest
+
+      - run: npm ci
+      - run: npm run check
+
+      # The tag is the version of record; package.json carries a placeholder.
+      # Re-running a tag is a no-op, so v0.1.0 stays green after its manual
+      # bootstrap publish.
+      - name: publish
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          if npm view "pi-mem0-gateway@${VERSION}" version >/dev/null 2>&1; then
+            echo "pi-mem0-gateway@${VERSION} is already on npm; nothing to do."
+            exit 0
+          fi
+          npm version "${VERSION}" --no-git-tag-version --allow-same-version
+          npm publish --access public

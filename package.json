@@ -1,0 +1,59 @@
+{
+	"name": "pi-mem0-gateway",
+	"version": "0.1.0",
+	"description": "pi extension: call Linear, Notion, PostHog, and Sentry through the mem0 gateway. One tool, five operations, credentials stay server-side",
+	"type": "module",
+	"license": "MIT",
+	"author": "pratikgajjar",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/pratikgajjar/pi-mem0-gateway.git"
+	},
+	"homepage": "https://github.com/pratikgajjar/pi-mem0-gateway#readme",
+	"bugs": {
+		"url": "https://github.com/pratikgajjar/pi-mem0-gateway/issues"
+	},
+	"keywords": [
+		"pi",
+		"pi-package",
+		"pi-extension",
+		"coding-agent",
+		"mem0",
+		"mcp",
+		"gateway",
+		"linear",
+		"notion",
+		"sentry",
+		"posthog"
+	],
+	"engines": {
+		"node": ">=22.19.0"
+	},
+	"files": [
+		"src",
+		"README.md",
+		"LICENSE"
+	],
+	"pi": {
+		"extensions": [
+			"./src/index.ts"
+		]
+	},
+	"publishConfig": {
+		"access": "public"
+	},
+	"scripts": {
+		"test": "node --test test/*.test.ts",
+		"typecheck": "tsc --noEmit",
+		"check": "npm run typecheck && npm test"
+	},
+	"peerDependencies": {
+		"@earendil-works/pi-ai": "*",
+		"@earendil-works/pi-coding-agent": "*",
+		"typebox": "*"
+	},
+	"devDependencies": {
+		"@types/node": "^22.0.0",
+		"typescript": "^5.6.0"
+	}
+}

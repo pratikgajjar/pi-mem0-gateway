@@ -16,7 +16,7 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import { Type } from "typebox";
 import { StringEnum } from "@earendil-works/pi-ai";
 import { GatewayError, resolveConfig, type GatewayConfig } from "./client.ts";
-import { OPERATIONS, run, type OperationParams } from "./operations.ts";
+import { OPERATIONS, run, type ApproveDestructive, type OperationParams } from "./operations.ts";
 import { loadSettings } from "./settings.ts";
 
 /** What the TUI and the session transcript keep for each call. No arguments, so no secrets. */
@@ -24,6 +24,34 @@ interface GatewayDetails {
 	operation: string;
 	tool: string | undefined;
 	failed: boolean;
+}
+
+/** Env opt-out for unattended runs. Set before pi starts, so the model cannot reach it. */
+const ALLOW_DESTRUCTIVE = "MEM0_GATEWAY_ALLOW_DESTRUCTIVE";
+
+/**
+ * Approve a destructive call, or refuse it.
+ *
+ * A dialog is the only approval the model cannot give itself, so an
+ * interactive session always asks. Without a UI there is no one to ask, so the
+ * call is refused unless the environment already allowed it.
+ */
+function approveDestructive(ctx: ExtensionContext, params: OperationParams): ApproveDestructive {
+	return async (toolName) => {
+		if (!ctx.hasUI) return process.env[ALLOW_DESTRUCTIVE] === "1";
+		return ctx.ui.confirm(
+			`Run ${toolName}?`,
+			`This writes through the mem0 gateway and other people see the change.\n\n${describeArguments(params)}`,
+		);
+	};
+}
+
+/** Show the exact change in the dialog, so the user approves a fact and not a tool name. */
+function describeArguments(params: OperationParams): string {
+	const args = params.arguments;
+	if (args === undefined || args === null || args === "") return "No arguments.";
+	const text = typeof args === "string" ? args : JSON.stringify(args, null, 2);
+	return text.length > 800 ? `${text.slice(0, 800)}\n… (truncated)` : text;
 }
 
 type GatewayToolResult = {
@@ -73,10 +101,11 @@ export default function mem0Gateway(pi: ExtensionAPI, _ctx: ExtensionContext) {
 			"Use mem0_gateway for work in external systems instead of asking the user for credentials; run its 'find' operation before concluding a tool does not exist, because the granted set changes during a session.",
 			"With mem0_gateway, read a tool's schema with operation 'describe' before the first 'invoke' of that tool, unless a schema is already attached to the find result or to a failed invoke.",
 			"When mem0_gateway denies a call, read the attached note first: it says whether the tool name is misspelled or the grant is missing. Request access only when the grant is missing, and never work around a denial.",
+			"mem0_gateway asks the user before a destructive call and refuses it when no one can answer; report that refusal with what the call would change instead of retrying it.",
 		],
 		parameters,
 
-		async execute(_toolCallId, params: OperationParams, signal, onUpdate) {
+		async execute(_toolCallId, params: OperationParams, signal, onUpdate, ctx) {
 			const failure = (text: string): GatewayToolResult => ({
 				content: [{ type: "text", text }],
 				isError: true,
@@ -89,7 +118,8 @@ export default function mem0Gateway(pi: ExtensionAPI, _ctx: ExtensionContext) {
 					content: [{ type: "text", text: `mem0 gateway: ${params.operation}…` }],
 					details: { operation: params.operation, tool: params.tool_name, failed: false },
 				});
-				const { text, result } = await run(params, active, signal);
+
+				const { text, result } = await run(params, active, signal, approveDestructive(ctx, params));
 				return {
 					content: [{ type: "text", text }],
 					isError: result.isError === true,

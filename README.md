@@ -53,6 +53,19 @@ The normal path is `find` → `describe` → `invoke`. Use `discover` when you w
 
 An empty `find` result is a **confirmed no-match**, not an error. When the granted search is empty, search again with `requestable: true`, then `request` what helps.
 
+## Writes ask first
+
+The gateway classifies each tool. A `destructive` one writes where other people read — a comment notifies an assignee, an edit changes a shared record.
+
+| Session | Behaviour |
+|---|---|
+| Interactive | The user gets a dialog showing the exact arguments |
+| No UI | Refused, unless `MEM0_GATEWAY_ALLOW_DESTRUCTIVE=1` is set before pi starts |
+
+Reads are never gated, and a tool's risk is read once per process, so a normal call keeps costing one request.
+
+This started as a `confirmed: true` parameter. Dogfooding killed it: the model set the flag on its own first attempt and posted to a live incident ticket. A parameter the model can fill is not a gate. A dialog, and an environment variable fixed before the process starts, are both outside its reach.
+
 ## Failures that fix themselves
 
 The gateway's errors are good, but each one costs another turn to act on. Two follow-ups are deterministic, so the extension makes them for you:

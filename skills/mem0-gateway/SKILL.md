@@ -69,4 +69,11 @@ Go around the gateway only when both the granted and the requestable search are 
 
 # Writes
 
-Each tool carries a `risk` field. Confirm the target with the user before a `destructive` call, unless they asked for that exact change.
+A `destructive` tool writes where other people read: a comment notifies an assignee, an edit changes a shared record.
+
+The extension gates these. You cannot approve one yourself:
+
+- **Interactive session** — the user gets a dialog with your exact arguments. Make the arguments say what you mean; the user approves that text.
+- **No UI** — the call is refused unless `MEM0_GATEWAY_ALLOW_DESTRUCTIVE=1` was set before pi started.
+
+On a refusal, stop. Report what the call would change and who would see it, then name the two ways forward: run it interactively, or start pi with that variable. Do not retry with different parameters.

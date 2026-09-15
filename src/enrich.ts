@@ -29,6 +29,45 @@ export function isDenied(text: string): boolean {
 	return DENIED.test(text);
 }
 
+/**
+ * Risk per tool, for this process only.
+ *
+ * Grants change while the agent works, so nothing about the catalogue is
+ * cached. A tool's risk classification is different: it is a property of the
+ * tool, and a stale answer costs one needless confirmation rather than a
+ * wrong one.
+ */
+const riskByTool = new Map<string, string>();
+
+/** Read a tool's risk, asking the gateway once per tool per process. */
+export async function riskOf(
+	toolName: string,
+	config: GatewayConfig,
+	signal?: AbortSignal,
+): Promise<string | undefined> {
+	const key = `${config.url}|${toolName}`;
+	const known = riskByTool.get(key);
+	if (known) return known;
+
+	const described = await probe("describe_tool", { tool_name: toolName }, config, signal);
+	if (!described || described.failed) return undefined;
+	try {
+		const risk = (JSON.parse(described.text) as { risk?: unknown }).risk;
+		if (typeof risk === "string" && risk !== "") {
+			riskByTool.set(key, risk);
+			return risk;
+		}
+	} catch {
+		// describe returned prose; treat the risk as unknown.
+	}
+	return undefined;
+}
+
+/** Clear the risk cache. Tests use this; normal runs never need it. */
+export function resetRiskCache(): void {
+	riskByTool.clear();
+}
+
 /** True when describe_tool reports the name itself is unknown or ungranted. */
 export function isUnknownTool(text: string): boolean {
 	return /is not a granted tool/i.test(text);

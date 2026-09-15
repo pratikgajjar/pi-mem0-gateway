@@ -5,7 +5,7 @@
 // what exists, which keeps the context cost flat as the org grants more tools.
 
 import { GatewayError, callTool, resultText, type GatewayConfig, type ToolResult } from "./client.ts";
-import { attachSchemaForSingleMatch, explainInvokeFailure } from "./enrich.ts";
+import { attachSchemaForSingleMatch, explainInvokeFailure, riskOf } from "./enrich.ts";
 
 export const OPERATIONS = ["discover", "find", "describe", "invoke", "request"] as const;
 export type Operation = (typeof OPERATIONS)[number];
@@ -87,12 +87,57 @@ export function isDenial(text: string): boolean {
 	return /\b(out_of_scope|denied|not granted|no access)\b/i.test(text);
 }
 
+/**
+ * Decide a destructive call. Returning false refuses it.
+ *
+ * The host owns this because only the host can reach a human.
+ */
+export type ApproveDestructive = (toolName: string, args: Record<string, unknown>) => Promise<boolean>;
+
+/**
+ * Refuse by default.
+ *
+ * The gateway classifies each tool, and a destructive call writes to a system
+ * other people read: a comment notifies an assignee, an edit changes a shared
+ * record. Dogfooding showed the model make that call from a plain instruction
+ * and name the blast radius only afterwards.
+ *
+ * A `confirmed` parameter was tried first and failed for the reason a prompt
+ * rule fails: the model set it on its own first attempt. Approval now comes
+ * from a dialog, or from an environment variable set before the process
+ * started. Both are outside the model's reach.
+ */
+const refuse: ApproveDestructive = async () => false;
+
+export function refusalText(toolName: string, args: Record<string, unknown>): string {
+	return [
+		`Refused: ${toolName} is classified destructive and this session cannot approve it.`,
+		"",
+		"Arguments:",
+		JSON.stringify(args.arguments ?? args, null, 2),
+		"",
+		"Report this to the user with what it would change and who would see it.",
+		"An interactive session asks the user directly. A non-interactive one needs",
+		"MEM0_GATEWAY_ALLOW_DESTRUCTIVE=1 in the environment before pi starts.",
+	].join("\n");
+}
+
 export async function run(
 	params: OperationParams,
 	config: GatewayConfig,
 	signal?: AbortSignal,
+	approve: ApproveDestructive = refuse,
 ): Promise<{ text: string; result: ToolResult }> {
 	const { name, args } = planCall(params);
+
+	if (params.operation === "invoke" && params.tool_name) {
+		const risk = await riskOf(params.tool_name, config, signal);
+		if (risk === "destructive" && !(await approve(params.tool_name, args))) {
+			const text = refusalText(params.tool_name, args);
+			return { text, result: { content: [{ type: "text", text }], isError: true } };
+		}
+	}
+
 	const result = await callTool(name, args, config, signal);
 	const text = resultText(result);
 

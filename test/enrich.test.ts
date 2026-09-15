@@ -114,9 +114,7 @@ test("a single find match gains its schema; several matches do not", async () =>
 });
 
 test("an oversized schema is named, not inlined", async () => {
-	// One live connector's schema is 21,913 characters. Attaching it turns a
-	// 42-character answer into 22 kB, which costs more than the describe call it
-	// saves.
+	// Inlining a large schema costs more context than the describe call it saves.
 	const huge = JSON.stringify({ name: "a__b", inputSchema: { blob: "x".repeat(25_000) } });
 	const stub = stubFetch({ describe_tool: { text: huge } });
 	try {

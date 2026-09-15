@@ -63,8 +63,13 @@ type GatewayToolResult = {
 const parameters = Type.Object({
 	operation: StringEnum(OPERATIONS, {
 		description:
-			"discover: full inventory. find: search granted tools for a task. describe: input schema of one tool. invoke: call a tool. request: ask an admin for access.",
+			"discover: connector names and tool counts, or one connector's tools when connector is set. find: search granted tools for a task. describe: input schema of one tool. invoke: call a tool. request: ask an admin for access.",
 	}),
+	connector: Type.Optional(
+		Type.String({
+			description: "For discover: list only this connector's tools. Omit for a summary of every connector.",
+		}),
+	),
 	task: Type.Optional(Type.String({ description: "For find: what you want to do. Omit to list all granted tools." })),
 	requestable: Type.Optional(
 		Type.Boolean({

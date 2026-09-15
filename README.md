@@ -43,13 +43,20 @@ Restart pi. Ask it for anything your org has connected.
 
 | Operation | Purpose | Key fields |
 |---|---|---|
-| `discover` | Full inventory of connectors and tools | — |
+| `discover` | Connector names and tool counts, or one connector's tools | `connector` |
 | `find` | Search granted tools for a task | `task`, `requestable` |
 | `describe` | Input schema of one tool | `tool_name` |
 | `invoke` | Call a granted tool | `tool_name`, `arguments` |
 | `request` | Ask an admin for access | `tool_names`, `reason` |
 
-The normal path is `find` → `describe` → `invoke`. Use `discover` when you want the whole catalogue.
+The normal path is `find` → `describe` → `invoke`.
+
+`discover` answers with a summary, because the full catalogue is large and stays in context for the rest of the session. Pass `connector` to list one connector's tools:
+
+```
+mem0_gateway(operation: "discover")                      # every connector, with counts
+mem0_gateway(operation: "discover", connector: "linear") # one connector's tools
+```
 
 An empty `find` result is a **confirmed no-match**, not an error. When the granted search is empty, search again with `requestable: true`, then `request` what helps.
 
@@ -64,7 +71,7 @@ The gateway classifies each tool. A `destructive` one writes where other people 
 
 Reads are never gated, and a tool's risk is read once per process, so a normal call keeps costing one request.
 
-This started as a `confirmed: true` parameter. Dogfooding killed it: the model set the flag on its own first attempt and posted to a live incident ticket. A parameter the model can fill is not a gate. A dialog, and an environment variable fixed before the process starts, are both outside its reach.
+A parameter the model can fill is not a gate. A dialog, and an environment variable fixed before the process starts, are both outside its reach.
 
 ## Failures that fix themselves
 

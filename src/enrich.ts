@@ -137,10 +137,9 @@ export async function explainInvokeFailure(
  * decided. Several matches are left alone: the model must choose first, and
  * schemas for all of them would cost more context than the choice is worth.
  *
- * A schema above MAX_ATTACHED_SCHEMA is left out. Measured against the live
- * gateway, one connector's schema is 21,913 characters: attaching it turns a
- * 42-character answer into 22 kB and costs more context than the describe call
- * it saves. The model calls describe for those, which is the cheaper trade.
+ * A schema above MAX_ATTACHED_SCHEMA is left out. Some schemas are large
+ * enough that inlining one costs more context than the describe call it saves,
+ * so the model calls describe for those instead.
  */
 const MAX_ATTACHED_SCHEMA = 4_000;
 

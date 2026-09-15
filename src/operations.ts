@@ -6,6 +6,7 @@
 
 import { GatewayError, callTool, resultText, type GatewayConfig, type ToolResult } from "./client.ts";
 import { attachSchemaForSingleMatch, explainInvokeFailure, riskOf } from "./enrich.ts";
+import { filterInventory } from "./inventory.ts";
 
 export const OPERATIONS = ["discover", "find", "describe", "invoke", "request"] as const;
 export type Operation = (typeof OPERATIONS)[number];
@@ -15,6 +16,7 @@ export interface OperationParams {
 	task?: string;
 	requestable?: boolean;
 	tool_name?: string;
+	connector?: string;
 	arguments?: Record<string, unknown> | string;
 	tool_names?: string[];
 	reason?: string;
@@ -99,13 +101,10 @@ export type ApproveDestructive = (toolName: string, args: Record<string, unknown
  *
  * The gateway classifies each tool, and a destructive call writes to a system
  * other people read: a comment notifies an assignee, an edit changes a shared
- * record. Dogfooding showed the model make that call from a plain instruction
- * and name the blast radius only afterwards.
+ * record.
  *
- * A `confirmed` parameter was tried first and failed for the reason a prompt
- * rule fails: the model set it on its own first attempt. Approval now comes
- * from a dialog, or from an environment variable set before the process
- * started. Both are outside the model's reach.
+ * Approval comes from a dialog, or from an environment variable set before the
+ * process started. A parameter the model can set is not a gate.
  */
 const refuse: ApproveDestructive = async () => false;
 
@@ -148,6 +147,10 @@ export async function run(
 	}
 	if (result.isError !== true && params.operation === "find") {
 		return { text: await attachSchemaForSingleMatch(text, config, signal), result };
+	}
+	if (result.isError !== true && params.operation === "discover") {
+		const filtered = filterInventory(text, params.connector);
+		return { text: filtered, result: { ...result, content: [{ type: "text", text: filtered }] } };
 	}
 	return { text, result };
 }

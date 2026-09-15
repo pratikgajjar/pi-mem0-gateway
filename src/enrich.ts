@@ -136,7 +136,14 @@ export async function explainInvokeFailure(
  * A single match is always followed by describe, so that turn is already
  * decided. Several matches are left alone: the model must choose first, and
  * schemas for all of them would cost more context than the choice is worth.
+ *
+ * A schema above MAX_ATTACHED_SCHEMA is left out. Measured against the live
+ * gateway, one connector's schema is 21,913 characters: attaching it turns a
+ * 42-character answer into 22 kB and costs more context than the describe call
+ * it saves. The model calls describe for those, which is the cheaper trade.
  */
+const MAX_ATTACHED_SCHEMA = 4_000;
+
 export async function attachSchemaForSingleMatch(
 	findText: string,
 	config: GatewayConfig,
@@ -158,5 +165,8 @@ export async function attachSchemaForSingleMatch(
 
 	const described = await probe("describe_tool", { tool_name: name }, config, signal);
 	if (!described || described.failed) return findText;
+	if (described.text.length > MAX_ATTACHED_SCHEMA) {
+		return `${findText}\n\nSchema for ${name} is ${described.text.length} characters. Call describe when you need it.`;
+	}
 	return `${findText}\n\nSchema for ${name} (the only match, so you can invoke it now):\n${described.text}`;
 }

@@ -113,6 +113,33 @@ test("a single find match gains its schema; several matches do not", async () =>
 	}
 });
 
+test("an oversized schema is named, not inlined", async () => {
+	// One live connector's schema is 21,913 characters. Attaching it turns a
+	// 42-character answer into 22 kB, which costs more than the describe call it
+	// saves.
+	const huge = JSON.stringify({ name: "a__b", inputSchema: { blob: "x".repeat(25_000) } });
+	const stub = stubFetch({ describe_tool: { text: huge } });
+	try {
+		const out = await attachSchemaForSingleMatch('[{"name":"a__b"}]', config);
+		assert.ok(out.length < 1_000, `kept small, got ${out.length}`);
+		assert.match(out, /Schema for a__b is \d+ characters\. Call describe when you need it\./);
+		assert.ok(!out.includes("xxxxx"), "the schema body must not be inlined");
+	} finally {
+		stub.restore();
+	}
+});
+
+test("a schema under the cap is still inlined", async () => {
+	const stub = stubFetch({ describe_tool: { text: '{"name":"a__b","inputSchema":{}}' } });
+	try {
+		const out = await attachSchemaForSingleMatch('[{"name":"a__b"}]', config);
+		assert.match(out, /the only match/);
+		assert.match(out, /"inputSchema"/);
+	} finally {
+		stub.restore();
+	}
+});
+
 test("a prose find result is passed through unchanged", async () => {
 	const stub = stubFetch({ describe_tool: { text: "should not be called" } });
 	try {

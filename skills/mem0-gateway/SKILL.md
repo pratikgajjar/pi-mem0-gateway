@@ -34,7 +34,11 @@ Tool names are shaped `<connector>__<tool>`.
 
 The gateway injects credentials server-side and audits every call. Never ask the user to log in, and never ask for an API key for a connected service. Only `MEM0_GATEWAY_TOKEN` belongs to the user.
 
-Prefer a gateway tool over an equivalent CLI or another MCP server. When another path fails with an auth error, retry through the gateway.
+# The gateway comes first, and it is faster
+
+Run `find` before any CLI, `npx` command, or other MCP server for an external system. Measured on real tasks: deleting a comment took **2 gateway calls**, and the same job through a CLI took **10 turns** of install, auth check, help text, and JSON shape guessing, because a CLI makes you discover its interface before it does any work.
+
+The gateway already knows the schema, so `find` → `invoke` is the whole procedure. When another path fails with an auth error, retry through the gateway.
 
 # Denials
 

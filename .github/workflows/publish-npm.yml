@@ -57,16 +57,20 @@ jobs:
 
       # A tag that builds but does not publish is worse than a loud failure,
       # because the next install silently gets the old version.
+      #
+      # The registry answers the publish before the version is readable. Waiting
+      # four minutes covers the propagation delay measured on this package;
+      # a shorter wait reports a healthy publish as a failure.
       - name: confirm the version is on npm
         run: |
           set -euo pipefail
           VERSION="${GITHUB_REF_NAME#v}"
-          for _ in $(seq 1 10); do
+          for _ in $(seq 1 40); do
             if npm view "pi-mem0-gateway@${VERSION}" version >/dev/null 2>&1; then
               echo "pi-mem0-gateway@${VERSION} is live."
               exit 0
             fi
             sleep 6
           done
-          echo "pi-mem0-gateway@${VERSION} did not appear on npm." >&2
+          echo "pi-mem0-gateway@${VERSION} did not appear on npm within four minutes." >&2
           exit 1

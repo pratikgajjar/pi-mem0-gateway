@@ -135,6 +135,14 @@ npm run release  # bump, tag, push; CI publishes
 
 All tests are offline. CI never calls the gateway, so no key is required and no run fails because a connector is unavailable.
 
+## Links
+
+- [npm package](https://www.npmjs.com/package/pi-mem0-gateway)
+- [Releases](https://github.com/pratikgajjar/pi-mem0-gateway/releases)
+- [Issues](https://github.com/pratikgajjar/pi-mem0-gateway/issues)
+- [mem0 gateway connectors](https://gateway.mem0.ai/connectors)
+- [pi](https://github.com/badlogic/pi-mono)
+
 ## License
 
 MIT

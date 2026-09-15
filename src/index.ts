@@ -67,12 +67,12 @@ export default function mem0Gateway(pi: ExtensionAPI, _ctx: ExtensionContext) {
 		name: "mem0_gateway",
 		label: "mem0 gateway",
 		description:
-			"Reach this organization's external tools (issue trackers, docs, analytics, monitoring, and any other connected MCP server or API) through the mem0 gateway. The gateway holds the credentials and audits every call, so never ask the user to log in or for an API key. The granted set differs per org: use operation 'discover' or 'find' to learn what exists instead of assuming. Normal path is 'find' for a task, then 'describe' for the schema, then 'invoke'. An empty find result is a confirmed no-match, not an error.",
+			"Reach this organization's external tools (issue trackers, docs, analytics, monitoring, and any other connected MCP server or API) through the mem0 gateway. The gateway holds the credentials and audits every call, so never ask the user to log in or for an API key. The granted set differs per org and changes while you work, so run 'discover' or 'find' to learn what exists instead of assuming, and run 'find' again after an access request or when the user says something changed. Normal path is 'find' for a task, then 'describe' for the schema, then 'invoke'. An empty find result is a confirmed no-match now, not an error and not permanent.",
 		promptSnippet: "Reach this org's connected external tools through the mem0 gateway",
 		promptGuidelines: [
-			"Use mem0_gateway for work in external systems instead of asking the user for credentials; run its 'find' operation before concluding a tool does not exist.",
-			"With mem0_gateway, read a tool's schema with operation 'describe' before the first 'invoke' of that tool.",
-			"When mem0_gateway denies a call as out_of_scope, report the denial and the pending access request. Do not work around it.",
+			"Use mem0_gateway for work in external systems instead of asking the user for credentials; run its 'find' operation before concluding a tool does not exist, because the granted set changes during a session.",
+			"With mem0_gateway, read a tool's schema with operation 'describe' before the first 'invoke' of that tool, unless a schema is already attached to the find result or to a failed invoke.",
+			"When mem0_gateway denies a call, read the attached note first: it says whether the tool name is misspelled or the grant is missing. Request access only when the grant is missing, and never work around a denial.",
 		],
 		parameters,
 

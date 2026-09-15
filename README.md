@@ -15,13 +15,15 @@ The mem0 gateway is already a meta-gateway — five verbs in front of your whole
 
 ## Connectors
 
-This extension names no connector, on purpose. An org connects **any MCP server or OpenAPI spec**, then grants tools per agent key. Your catalogue is yours, it differs from everyone else's, and it changes without a release here.
+This extension names no connector, on purpose. An org connects **any MCP server or OpenAPI spec**, then grants tools per agent key. Your catalogue is yours, and it changes while you work — an admin connects a source or approves a request at any time.
 
-Ask the gateway instead:
+So nothing is cached. Every `discover` and `find` is a live call, and a tool granted a minute ago is usable now, with no restart and no new release here.
 
 ```
 mem0_gateway(operation: "discover")
 ```
+
+A no-match means "not right now". After an access request, ask again.
 
 ## Install
 

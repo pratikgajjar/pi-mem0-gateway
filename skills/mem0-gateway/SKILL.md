@@ -3,27 +3,30 @@ name: mem0-gateway
 description: "Work in external systems (issue trackers, docs, analytics, monitoring, and any other connected service) through the mem0 gateway with the mem0_gateway tool. Use when a task needs a tool this org has connected, when a gateway call is denied, or when a connector returns an auth error."
 ---
 
-# Find before you conclude
+# Ask, do not assume
 
-The granted catalogue differs per organization and changes without a release. Never assume a tool exists or does not exist:
+The granted set differs per organization and changes while you work: an admin connects a source or approves a request at any time. Nothing here is cached.
 
 ```
 mem0_gateway(operation: "find", task: "what you want to do")
 mem0_gateway(operation: "discover")          // whole inventory
 ```
 
-`find` returns `[]` for a confirmed no-match, not a failure. `discover` names every connector and tool the key holds.
+Two rules follow from that:
+
+- A no-match is true **now**, not forever. After you request access, or when the user says something changed, run `find` again.
+- Never tell the user a capability does not exist without running `find` in this session.
 
 # The normal path
 
-1. `find` with the task to get candidate names.
-2. `describe` with `tool_name` to read the input schema.
+1. `find` with the task.
+2. `describe` with `tool_name` for the schema.
 3. `invoke` with `tool_name` and `arguments`.
 
-Argument names are not guessable: a field may be `assignee` where you expect `assigneeId`. Two shortcuts save you a turn:
+Argument names are not guessable: a field may be `assignee` where you expect `assigneeId`. Two shortcuts skip step 2:
 
-- When `find` returns exactly **one** tool, its schema is already attached. Invoke it directly; skip step 2.
-- When an `invoke` fails on arguments, the schema is attached to the error. Read it and retry; do not call `describe` first.
+- `find` with exactly one match attaches that schema. Invoke directly.
+- A failed `invoke` attaches the schema. Read it and retry.
 
 Tool names are shaped `<connector>__<tool>`.
 
@@ -31,37 +34,39 @@ Tool names are shaped `<connector>__<tool>`.
 
 The gateway injects credentials server-side and audits every call. Never ask the user to log in, and never ask for an API key for a connected service. Only `MEM0_GATEWAY_TOKEN` belongs to the user.
 
-Prefer a gateway tool over an equivalent CLI or another MCP server. When another path fails with an auth error, retry the task through the gateway.
+Prefer a gateway tool over an equivalent CLI or another MCP server. When another path fails with an auth error, retry through the gateway.
 
-# When a call is denied
+# Denials
 
-First read the note attached to the denial. `out_of_scope` has two very different causes, and the note says which one you hit:
+Read the note attached to the denial. `out_of_scope` has two causes and the note says which:
 
-- **"is not a granted tool name"** — you misspelled it. Fix the name from the suggestions. Do **not** request access; the tool may already be yours.
-- **"IS granted"** — the name is fine, so the refusal is about this call. Re-read the arguments and the target.
+| Note | Meaning | Do |
+|---|---|---|
+| `is not a granted tool name` | You misspelled it | Fix the name from the suggestions |
+| `IS granted` | Name is fine | Re-read the arguments and the target |
+| neither | The grant is missing | Request access |
 
-Only when neither note appears is the grant itself missing. Then do not work around it, and do not retry the same call.
+To request:
 
 ```
 mem0_gateway(operation: "find", task: "...", requestable: true)
-mem0_gateway(operation: "request", tool_names: ["<name>"], reason: "why you need it")
+mem0_gateway(operation: "request", tool_names: ["<name>"], reason: "why")
 ```
 
-Approval is asynchronous and can take hours. Tell the user what you requested and why, report it as pending, and **do not poll**. Once approved, `describe` succeeds and the same key works.
+Approval is asynchronous and takes hours. Say what you requested and why, report it as pending, and **do not poll**. Once approved the same key works — `find` shows it.
 
-Go around the gateway only when both the granted and the requestable search are empty. A denial or a pending request is never a reason to go around it.
+Go around the gateway only when both the granted and the requestable search are empty.
 
-# Reading failures
+# Other failures
 
-| Message | Meaning | Next step |
+| Message | Meaning | Do |
 |---|---|---|
-| `(config)` | No key, or malformed arguments | Ask the user to set `MEM0_GATEWAY_TOKEN`, or fix the JSON |
-| `(transport)` | Unreachable, timed out, or key rejected | Report it; a 401 means the gateway key is wrong |
-| `out_of_scope` | Not granted to this key | `find --requestable`, then `request` |
-| `upstream_401` | That connector's own auth expired | Tell the user to reconnect it in the mem0 admin console. The gateway key is fine |
+| `(config)` | No key, or bad JSON | Ask for `MEM0_GATEWAY_TOKEN`, or fix the arguments |
+| `(transport)` | Unreachable, timed out, or key rejected | Report it |
+| `upstream_401` | That connector's own auth expired | Say which connector to reconnect in the mem0 admin console |
 
-`upstream_401` is not your key and not your bug. Name the connector and the console step.
+`upstream_401` is not your key and not your bug.
 
 # Writes
 
-Each tool carries a `risk` field. Treat `destructive` as it reads: confirm the target with the user before a call that creates, edits, or deletes, unless they already asked for that exact change.
+Each tool carries a `risk` field. Confirm the target with the user before a `destructive` call, unless they asked for that exact change.

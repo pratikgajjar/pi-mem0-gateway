@@ -1,9 +1,16 @@
-// pi-mem0-gateway — one tool for the mem0 gateway (Linear, Notion, PostHog,
-// Sentry). The gateway injects credentials server-side, so no connector login
-// happens on this machine and no API key is stored here.
+// pi-mem0-gateway — one tool for every connector behind the mem0 gateway. The
+// gateway injects credentials server-side, so no connector login happens on
+// this machine and no API key is stored here.
 //
 // One registered tool, five operations. A per-connector tool surface would cost
 // thousands of tokens for a catalogue the model can query on demand instead.
+//
+// No connector is named anywhere in this extension. An org connects any MCP
+// server or OpenAPI spec (https://gateway.mem0.ai/connectors), and grants tools
+// per agent key, so the catalogue differs for every user and changes without a
+// release. `discover` and `find` are the only honest source of that list;
+// hardcoding names would bias the model toward tools it may not hold and hide
+// the ones it does.
 
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
@@ -36,7 +43,9 @@ const parameters = Type.Object({
 			description: "For find: show tools you do NOT have yet. Use only after a granted search returns nothing.",
 		}),
 	),
-	tool_name: Type.Optional(Type.String({ description: "For describe and invoke: exact tool name, e.g. linear__get_issue." })),
+	tool_name: Type.Optional(
+		Type.String({ description: "For describe and invoke: exact tool name from find or discover, shaped <connector>__<tool>." }),
+	),
 	arguments: Type.Optional(
 		Type.Union([Type.Object({}, { additionalProperties: true }), Type.String()], {
 			description: "For invoke: the tool's arguments as an object. Read the schema with describe first.",
@@ -58,10 +67,10 @@ export default function mem0Gateway(pi: ExtensionAPI, _ctx: ExtensionContext) {
 		name: "mem0_gateway",
 		label: "mem0 gateway",
 		description:
-			"Call Linear, Notion, PostHog, and Sentry through the mem0 gateway. The gateway holds the credentials and audits every call, so never ask the user to log in or for an API key. Start with operation 'find' to locate a tool for the task, then 'describe' for its schema, then 'invoke'. An empty find result is a confirmed no-match, not an error.",
-		promptSnippet: "Reach external tools (Linear, Notion, PostHog, Sentry) through the mem0 gateway",
+			"Reach this organization's external tools (issue trackers, docs, analytics, monitoring, and any other connected MCP server or API) through the mem0 gateway. The gateway holds the credentials and audits every call, so never ask the user to log in or for an API key. The granted set differs per org: use operation 'discover' or 'find' to learn what exists instead of assuming. Normal path is 'find' for a task, then 'describe' for the schema, then 'invoke'. An empty find result is a confirmed no-match, not an error.",
+		promptSnippet: "Reach this org's connected external tools through the mem0 gateway",
 		promptGuidelines: [
-			"Use mem0_gateway for Linear, Notion, PostHog, and Sentry work instead of asking the user for credentials.",
+			"Use mem0_gateway for work in external systems instead of asking the user for credentials; run its 'find' operation before concluding a tool does not exist.",
 			"With mem0_gateway, read a tool's schema with operation 'describe' before the first 'invoke' of that tool.",
 			"When mem0_gateway denies a call as out_of_scope, report the denial and the pending access request. Do not work around it.",
 		],

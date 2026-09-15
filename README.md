@@ -1,17 +1,27 @@
 # pi-mem0-gateway
 
-Call **Linear, Notion, PostHog, and Sentry** from [pi](https://github.com/badlogic/pi-mono) through the [mem0 gateway](https://mem0.ai). The gateway holds the credentials, so pi never asks you to log in to a connector and no API key for those services is stored on your machine.
+Reach every tool your organization has connected to the [mem0 gateway](https://gateway.mem0.ai/connectors) from [pi](https://github.com/badlogic/pi-mono) — through **one** tool. The gateway holds the credentials, so pi never asks you to log in to a connector and no third-party API key is stored on your machine.
 
 ```
-mem0_gateway(operation: "find", task: "list linear teams")
-mem0_gateway(operation: "invoke", tool_name: "linear__list_teams", arguments: { limit: 3 })
+mem0_gateway(operation: "find", task: "list my open issues")
+mem0_gateway(operation: "invoke", tool_name: "<connector>__<tool>", arguments: { limit: 3 })
 ```
 
 ## Why one tool
 
 pi ships no MCP client [by design](https://mariozechner.at/posts/2025-11-02-what-if-you-dont-need-mcp/): tool definitions are verbose, and a connected server costs context on every turn whether you use it or not.
 
-The mem0 gateway is already a meta-gateway — five verbs in front of a catalogue of 90+ connector tools. This extension registers **one** tool with those five operations, so the context cost stays flat as your org grants more tools. The model queries the catalogue on demand instead of carrying it.
+The mem0 gateway is already a meta-gateway — five verbs in front of your whole catalogue. This extension registers **one** tool with those five operations, so the context cost stays flat no matter how many connectors your org adds. The model queries the catalogue on demand instead of carrying it.
+
+## Connectors
+
+This extension names no connector, on purpose. An org connects **any MCP server or OpenAPI spec**, then grants tools per agent key. Your catalogue is yours, it differs from everyone else's, and it changes without a release here.
+
+Ask the gateway instead:
+
+```
+mem0_gateway(operation: "discover")
+```
 
 ## Install
 
@@ -25,7 +35,7 @@ Then set your gateway key:
 export MEM0_GATEWAY_TOKEN="mg_..."
 ```
 
-Restart pi. Ask it for anything in Linear, Notion, PostHog, or Sentry.
+Restart pi. Ask it for anything your org has connected.
 
 ## Operations
 
@@ -40,6 +50,21 @@ Restart pi. Ask it for anything in Linear, Notion, PostHog, or Sentry.
 The normal path is `find` → `describe` → `invoke`. Use `discover` when you want the whole catalogue.
 
 An empty `find` result is a **confirmed no-match**, not an error. When the granted search is empty, search again with `requestable: true`, then `request` what helps.
+
+## Failures that fix themselves
+
+The gateway's errors are good, but each one costs another turn to act on. Two follow-ups are deterministic, so the extension makes them for you:
+
+| You hit | Attached automatically | Turn saved |
+|---|---|---|
+| `invoke` fails on arguments | the tool's input schema | the `describe` call |
+| `find` returns exactly one tool | that tool's input schema | the `describe` call |
+| `invoke` denied, name misspelled | "is not a granted tool name" + near matches | a wrong access request |
+| `invoke` denied, name valid | "IS granted, the refusal is about this call" | a wrong access request |
+
+That third row is the reason this exists: `invoke` answers a **misspelled name** with `out_of_scope`, the same code it uses for a tool you truly lack. Without the check, the documented path requests access to a tool you already hold.
+
+A successful call still costs exactly one request. The probes run only on the failures above, and a failed probe leaves the original error untouched.
 
 ## Configuration
 
@@ -76,7 +101,7 @@ Each failure returns readable text, never a stack trace. The model can act on al
 | `(transport)` | Gateway unreachable, timed out, or the key was rejected |
 | `(tool)` | The gateway or the connector refused the call |
 | `denied ... (out_of_scope)` | You lack access. Use `find` with `requestable`, then `request` |
-| `upstream_401` | The connector needs a reconnect in the mem0 admin console. Your key is fine |
+| `upstream_401` | That connector needs a reconnect in the mem0 admin console. Your key is fine |
 
 An access request is asynchronous and can take hours. Report it as pending and do not poll.
 
@@ -88,6 +113,8 @@ npm run check   # tsc --noEmit, then node --test
 ```
 
 `src/client.ts` is a ~100 line MCP Streamable HTTP client. The gateway is stateless — no `initialize` handshake, no session id — so an SDK is not needed. Responses are parsed as JSON or as SSE `data:` frames, because the endpoint may use either.
+
+Every test is offline. CI never calls the gateway, so no key is needed and no run is flaky because a connector is down.
 
 ## License
 

@@ -5,6 +5,7 @@
 // what exists, which keeps the context cost flat as the org grants more tools.
 
 import { GatewayError, callTool, resultText, type GatewayConfig, type ToolResult } from "./client.ts";
+import { attachSchemaForSingleMatch, explainInvokeFailure } from "./enrich.ts";
 
 export const OPERATIONS = ["discover", "find", "describe", "invoke", "request"] as const;
 export type Operation = (typeof OPERATIONS)[number];
@@ -93,5 +94,15 @@ export async function run(
 ): Promise<{ text: string; result: ToolResult }> {
 	const { name, args } = planCall(params);
 	const result = await callTool(name, args, config, signal);
-	return { text: resultText(result), result };
+	const text = resultText(result);
+
+	// Recovery probes run only where they change the next step, so a normal
+	// call still costs exactly one request.
+	if (result.isError === true && params.operation === "invoke" && params.tool_name) {
+		return { text: await explainInvokeFailure(params.tool_name, text, config, signal), result };
+	}
+	if (result.isError !== true && params.operation === "find") {
+		return { text: await attachSchemaForSingleMatch(text, config, signal), result };
+	}
+	return { text, result };
 }

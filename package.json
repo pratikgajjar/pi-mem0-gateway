@@ -1,7 +1,7 @@
 {
 	"name": "pi-mem0-gateway",
-	"version": "0.1.0",
-	"description": "pi extension: call Linear, Notion, PostHog, and Sentry through the mem0 gateway. One tool, five operations, credentials stay server-side",
+	"version": "0.2.0",
+	"description": "pi extension: reach every connector behind the mem0 gateway from one tool. Five operations, credentials stay server-side",
 	"type": "module",
 	"license": "MIT",
 	"author": "pratikgajjar",
@@ -17,26 +17,29 @@
 		"pi",
 		"pi-package",
 		"pi-extension",
+		"pi-skill",
 		"coding-agent",
 		"mem0",
 		"mcp",
 		"gateway",
-		"linear",
-		"notion",
-		"sentry",
-		"posthog"
+		"connectors",
+		"tool-access"
 	],
 	"engines": {
 		"node": ">=22.19.0"
 	},
 	"files": [
 		"src",
+		"skills",
 		"README.md",
 		"LICENSE"
 	],
 	"pi": {
 		"extensions": [
 			"./src/index.ts"
+		],
+		"skills": [
+			"./skills"
 		]
 	},
 	"publishConfig": {

@@ -27,9 +27,9 @@ test("describe and invoke require a tool name", () => {
 });
 
 test("invoke defaults to empty arguments and passes an object through", () => {
-	assert.deepEqual(planCall({ operation: "invoke", tool_name: "linear__list_teams" }), {
+	assert.deepEqual(planCall({ operation: "invoke", tool_name: "tracker__list_things" }), {
 		name: "invoke",
-		args: { tool_name: "linear__list_teams", arguments: {} },
+		args: { tool_name: "tracker__list_things", arguments: {} },
 	});
 	assert.deepEqual(planCall({ operation: "invoke", tool_name: "t", arguments: { limit: 5 } }).args.arguments, {
 		limit: 5,
@@ -54,9 +54,9 @@ test("request needs at least one name and keeps the reason", () => {
 		(error: GatewayError) => error.kind === "config" && /tool_names/.test(error.message),
 	);
 	assert.throws(() => planCall({ operation: "request", tool_names: ["  "] }), { name: "GatewayError" });
-	assert.deepEqual(planCall({ operation: "request", tool_names: ["posthog__query"], reason: "weekly report" }), {
+	assert.deepEqual(planCall({ operation: "request", tool_names: ["analytics__query"], reason: "weekly report" }), {
 		name: "request_access",
-		args: { tool_names: ["posthog__query"], reason: "weekly report" },
+		args: { tool_names: ["analytics__query"], reason: "weekly report" },
 	});
 });
 

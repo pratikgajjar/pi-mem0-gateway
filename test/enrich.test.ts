@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { attachSchemaForSingleMatch, explainInvokeFailure, isArgumentError, isDenied, isUnknownTool } from "../src/enrich.ts";
+import {
+	attachSchemaForSingleMatch,
+	compactSchema,
+	explainInvokeFailure,
+	isArgumentError,
+	isDenied,
+	isUnknownTool,
+} from "../src/enrich.ts";
 import type { GatewayConfig } from "../src/client.ts";
 
 const config: GatewayConfig = { url: "https://gateway.invalid/mcp", token: "mg_test", timeoutMs: 1_000 };
@@ -144,6 +151,61 @@ test("a prose find result is passed through unchanged", async () => {
 		const prose = "No granted tools matched that task. This is a confirmed no-match, not an error.";
 		assert.equal(await attachSchemaForSingleMatch(prose, config), prose);
 		assert.deepEqual(stub.calls, []);
+	} finally {
+		stub.restore();
+	}
+});
+
+test("a long property description is cut but the structure survives", () => {
+	const schema = JSON.stringify({
+		name: "a__b",
+		inputSchema: {
+			type: "object",
+			required: ["command", "context"],
+			properties: {
+				command: { type: "string", description: `manual ${"x".repeat(30_000)}` },
+				context: { type: "string", description: "why you are calling this" },
+			},
+		},
+	});
+
+	const out = compactSchema(schema);
+	assert.ok(out.length < 2_000, `still large: ${out.length}`);
+
+	const parsed = JSON.parse(out);
+	assert.deepEqual(parsed.inputSchema.required, ["command", "context"]);
+	assert.deepEqual(Object.keys(parsed.inputSchema.properties), ["command", "context"]);
+	assert.equal(parsed.inputSchema.properties.command.type, "string");
+	assert.match(parsed.inputSchema.properties.command.description, /^manual xxx/);
+	assert.match(parsed.inputSchema.properties.command.description, /call describe for the full text/);
+	assert.equal(parsed.inputSchema.properties.context.description, "why you are calling this");
+});
+
+test("a schema with no long prose is returned unchanged", () => {
+	const schema = JSON.stringify({ name: "a__b", inputSchema: { type: "object", required: ["id"] } }, null, 2);
+	assert.equal(compactSchema(schema), schema);
+});
+
+test("text that is not JSON is passed through", () => {
+	assert.equal(compactSchema("the gateway said something new"), "the gateway said something new");
+});
+
+test("an argument error carries the schema, shortened", async () => {
+	const huge = JSON.stringify({
+		name: "a__b",
+		inputSchema: { required: ["context"], properties: { command: { description: "y".repeat(30_000) } } },
+	});
+	const stub = stubFetch({ describe_tool: { text: huge } });
+	try {
+		const out = await explainInvokeFailure(
+			"a__b",
+			"mem0 gateway: invalid arguments — 'context' is a required property",
+			config,
+		);
+		assert.ok(out.length < 2_000, `error payload still large: ${out.length}`);
+		assert.match(out, /Schema for a__b/);
+		// The schema is what fixes the call, so it is shortened, never dropped.
+		assert.match(out, /"required": \[\s*"context"\s*\]/);
 	} finally {
 		stub.restore();
 	}

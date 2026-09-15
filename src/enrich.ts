@@ -104,7 +104,7 @@ export async function explainInvokeFailure(
 	if (isArgumentError(failureText)) {
 		const described = await probe("describe_tool", { tool_name: toolName }, config, signal);
 		if (!described || described.failed) return failureText;
-		return `${failureText}\n\nSchema for ${toolName}:\n${described.text}`;
+		return `${failureText}\n\nSchema for ${toolName}:\n${compactSchema(described.text)}`;
 	}
 
 	if (isDenied(failureText)) {
@@ -128,6 +128,45 @@ export async function explainInvokeFailure(
 	}
 
 	return failureText;
+}
+
+/**
+ * Shorten a schema while keeping what fixes a call.
+ *
+ * Property descriptions can hold a whole CLI manual, which dwarfs the
+ * structure around it. Required fields, property names, and types are what an
+ * argument error needs; the prose is not, and it stays available through
+ * describe.
+ */
+const MAX_PROPERTY_DESCRIPTION = 400;
+
+export function compactSchema(schemaText: string): string {
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(schemaText);
+	} catch {
+		return schemaText;
+	}
+	if (typeof parsed !== "object" || parsed === null) return schemaText;
+
+	let trimmed = 0;
+	const walk = (node: unknown): unknown => {
+		if (Array.isArray(node)) return node.map(walk);
+		if (typeof node !== "object" || node === null) return node;
+		const out: Record<string, unknown> = {};
+		for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
+			if (key === "description" && typeof value === "string" && value.length > MAX_PROPERTY_DESCRIPTION) {
+				trimmed += value.length - MAX_PROPERTY_DESCRIPTION;
+				out[key] = `${value.slice(0, MAX_PROPERTY_DESCRIPTION)}… [cut; call describe for the full text]`;
+				continue;
+			}
+			out[key] = walk(value);
+		}
+		return out;
+	};
+
+	const compact = JSON.stringify(walk(parsed), null, 2);
+	return trimmed > 0 ? compact : schemaText.length <= compact.length ? schemaText : compact;
 }
 
 /**
@@ -164,8 +203,9 @@ export async function attachSchemaForSingleMatch(
 
 	const described = await probe("describe_tool", { tool_name: name }, config, signal);
 	if (!described || described.failed) return findText;
-	if (described.text.length > MAX_ATTACHED_SCHEMA) {
-		return `${findText}\n\nSchema for ${name} is ${described.text.length} characters. Call describe when you need it.`;
+	const schema = compactSchema(described.text);
+	if (schema.length > MAX_ATTACHED_SCHEMA) {
+		return `${findText}\n\nSchema for ${name} is ${schema.length} characters. Call describe when you need it.`;
 	}
-	return `${findText}\n\nSchema for ${name} (the only match, so you can invoke it now):\n${described.text}`;
+	return `${findText}\n\nSchema for ${name} (the only match, so you can invoke it now):\n${schema}`;
 }

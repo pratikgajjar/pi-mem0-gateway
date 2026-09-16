@@ -18,6 +18,7 @@ import { StringEnum } from "@earendil-works/pi-ai";
 import { GatewayError, resolveConfig, type GatewayConfig } from "./client.ts";
 import { OPERATIONS, run, type ApproveDestructive, type OperationParams } from "./operations.ts";
 import { loadSettings } from "./settings.ts";
+import { cacheKey, describeConnectors, readConnectors, writeConnectors } from "./connectors.ts";
 
 /** What the TUI and the session transcript keep for each call. No arguments, so no secrets. */
 interface GatewayDetails {
@@ -60,6 +61,9 @@ type GatewayToolResult = {
 	details: GatewayDetails;
 };
 
+const BASE_DESCRIPTION =
+	"Reach this organization's external tools (issue trackers, docs, analytics, monitoring, and any other connected MCP server or API) through the mem0 gateway. The gateway holds the credentials and audits every call, so never ask the user to log in or for an API key. The granted set differs per org and changes while you work, so run 'discover' or 'find' to learn what exists instead of assuming, and run 'find' again after an access request or when the user says something changed. Normal path is 'find' for a task, then 'describe' for the schema, then 'invoke'. An empty find result is a confirmed no-match now, not an error and not permanent.";
+
 const parameters = Type.Object({
 	operation: StringEnum(OPERATIONS, {
 		description:
@@ -96,11 +100,22 @@ export default function mem0Gateway(pi: ExtensionAPI, _ctx: ExtensionContext) {
 	let cached: GatewayConfig | undefined;
 	const config = (): GatewayConfig => (cached ??= resolveConfig(loadSettings()));
 
+	// No key means no remembered names, and no reason to fail the load.
+	const keyOrUndefined = (): string | undefined => {
+		try {
+			const active = config();
+			return cacheKey(active.token, active.url);
+		} catch {
+			return undefined;
+		}
+	};
+	const startupKey = keyOrUndefined();
+	const remembered = (): string[] => (startupKey ? readConnectors(startupKey) : []);
+
 	pi.registerTool({
 		name: "mem0_gateway",
 		label: "mem0 gateway",
-		description:
-			"Reach this organization's external tools (issue trackers, docs, analytics, monitoring, and any other connected MCP server or API) through the mem0 gateway. The gateway holds the credentials and audits every call, so never ask the user to log in or for an API key. The granted set differs per org and changes while you work, so run 'discover' or 'find' to learn what exists instead of assuming, and run 'find' again after an access request or when the user says something changed. Normal path is 'find' for a task, then 'describe' for the schema, then 'invoke'. An empty find result is a confirmed no-match now, not an error and not permanent.",
+		description: describeConnectors(BASE_DESCRIPTION, remembered()),
 		promptSnippet: "Reach this org's connected external tools through the mem0 gateway",
 		promptGuidelines: [
 			"Run mem0_gateway 'find' before any CLI, npx command, or other MCP server for an external system, and before concluding a capability does not exist; one gateway call replaces the install, login, and flag discovery that a CLI needs, and the granted set changes during a session.",
@@ -124,7 +139,8 @@ export default function mem0Gateway(pi: ExtensionAPI, _ctx: ExtensionContext) {
 					details: { operation: params.operation, tool: params.tool_name, failed: false },
 				});
 
-				const { text, result } = await run(params, active, signal, approveDestructive(ctx, params));
+				const { text, result, connectors } = await run(params, active, signal, approveDestructive(ctx, params));
+				if (connectors) writeConnectors(cacheKey(active.token, active.url), connectors);
 				return {
 					content: [{ type: "text", text }],
 					isError: result.isError === true,

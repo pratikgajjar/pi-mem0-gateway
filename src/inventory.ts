@@ -37,6 +37,12 @@ export function parseInventory(markdown: string): InventoryTool[] {
 	return tools;
 }
 
+/** Distinct connector names, sorted. */
+export function connectorNames(markdown: string): string[] {
+	const tools = parseInventory(markdown);
+	return [...new Set(tools.map((t) => t.connector).filter(Boolean))].sort();
+}
+
 /** Collapse the inventory to connector names and counts. */
 export function summarise(tools: InventoryTool[]): string {
 	const byConnector = new Map<string, Map<string, number>>();

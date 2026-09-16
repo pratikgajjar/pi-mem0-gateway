@@ -33,7 +33,17 @@ pi ships no MCP client [by design](https://mariozechner.at/posts/2025-11-02-what
 
 The mem0 gateway is itself a meta-gateway — five verbs in front of an entire catalogue. This extension registers one tool carrying those five operations, so context cost stays constant as an organization adds connectors. The model queries the catalogue on demand rather than holding it.
 
-No connector is named anywhere in this package. An organization connects any MCP server or OpenAPI specification and grants tools per agent key, so each catalogue differs and changes during a session. Nothing is cached: every `discover` and `find` is a live call, and a tool granted during a session is usable immediately, with no restart.
+No connector is named in this package's source. An organization connects any MCP server or OpenAPI specification and grants tools per agent key, so each catalogue differs and changes during a session. Every `discover` and `find` is a live call, and a tool granted during a session is usable immediately, with no restart.
+
+### Connected apps in the tool description
+
+After a `discover`, the granted connector names are written to `~/.pi/agent/mem0-gateway-connectors.json` and appended to the tool description at the next start, so the model can see which applications are connected without spending a call:
+
+```
+Connected apps seen in an earlier session: linear, notion, posthog, sentry.
+```
+
+Names only, taken verbatim from the gateway, capped at twelve. The description marks them as a hint rather than the current grant, because the list is written by an earlier session and `discover` and `find` stay authoritative. Entries are keyed by a digest of the token and URL, so two organizations on one machine stay separate and the token never reaches the file. Delete the file to clear it.
 
 ## Operations
 

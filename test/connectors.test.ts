@@ -66,6 +66,10 @@ test("a missing cache reads as empty", () => {
 	assert.deepEqual(readConnectors("nope", tempEnv()), []);
 });
 
+test("no key reads as empty", () => {
+	assert.deepEqual(readConnectors(undefined, tempEnv()), []);
+});
+
 test("a damaged cache reads as empty", () => {
 	const env = tempEnv();
 	const file = path.join(env.PI_CODING_AGENT_DIR!, "mem0-gateway-connectors.json");

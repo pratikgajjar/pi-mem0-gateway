@@ -1,7 +1,7 @@
-// Remember granted connector names between sessions. `description` is a fixed
-// string read once at load, so a live list would mean a blocking startup call.
-// The cached list is one session old, and the description says so: a cached
-// list presented as fact is the bug f6e0645 fixed.
+// Remember granted connector names between sessions. `description` is read once
+// at load, so a live list would mean a blocking startup call. The cached list is
+// one session old and the description says so: a cached list presented as fact
+// is the bug f6e0645 fixed.
 
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -34,7 +34,8 @@ function readAll(file: string): Record<string, CacheEntry> {
 	}
 }
 
-export function readConnectors(key: string, env: NodeJS.ProcessEnv = process.env): string[] {
+export function readConnectors(key: string | undefined, env: NodeJS.ProcessEnv = process.env): string[] {
+	if (!key) return [];
 	const entry = readAll(cachePath(env))[key];
 	return Array.isArray(entry?.connectors) ? entry.connectors.filter((n) => typeof n === "string") : [];
 }

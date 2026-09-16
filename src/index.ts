@@ -101,7 +101,7 @@ export default function mem0Gateway(pi: ExtensionAPI, _ctx: ExtensionContext) {
 	const config = (): GatewayConfig => (cached ??= resolveConfig(loadSettings()));
 
 	// No key means no remembered names, and no reason to fail the load.
-	const keyOrUndefined = (): string | undefined => {
+	const key = (): string | undefined => {
 		try {
 			const active = config();
 			return cacheKey(active.token, active.url);
@@ -109,13 +109,22 @@ export default function mem0Gateway(pi: ExtensionAPI, _ctx: ExtensionContext) {
 			return undefined;
 		}
 	};
-	const startupKey = keyOrUndefined();
-	const remembered = (): string[] => (startupKey ? readConnectors(startupKey) : []);
+
+	// discover writes the names, but the promoted path is find. Seed once, in the
+	// background, with no signal: an ending turn must not cancel the write.
+	let seeded = false;
+	const seed = (active: GatewayConfig, cacheId: string): void => {
+		if (seeded || readConnectors(cacheId).length > 0) return;
+		seeded = true;
+		void run({ operation: "discover" }, active)
+			.then(({ connectors }) => connectors?.length && writeConnectors(cacheId, connectors))
+			.catch(() => {});
+	};
 
 	pi.registerTool({
 		name: "mem0_gateway",
 		label: "mem0 gateway",
-		description: describeConnectors(BASE_DESCRIPTION, remembered()),
+		description: describeConnectors(BASE_DESCRIPTION, readConnectors(key())),
 		promptSnippet: "Reach this org's connected external tools through the mem0 gateway",
 		promptGuidelines: [
 			"Run mem0_gateway 'find' before any CLI, npx command, or other MCP server for an external system, and before concluding a capability does not exist; one gateway call replaces the install, login, and flag discovery that a CLI needs, and the granted set changes during a session.",
@@ -140,7 +149,9 @@ export default function mem0Gateway(pi: ExtensionAPI, _ctx: ExtensionContext) {
 				});
 
 				const { text, result, connectors } = await run(params, active, signal, approveDestructive(ctx, params));
-				if (connectors) writeConnectors(cacheKey(active.token, active.url), connectors);
+				const cacheId = cacheKey(active.token, active.url);
+				if (connectors) writeConnectors(cacheId, connectors);
+				else if (result.isError !== true) seed(active, cacheId);
 				return {
 					content: [{ type: "text", text }],
 					isError: result.isError === true,

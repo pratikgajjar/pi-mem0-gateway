@@ -79,33 +79,18 @@ during a session: find again after an access request or when the user says they 
 An empty find result means no match now, not a permanent lack of capability.`;
 
 const parameters = Type.Object({
-	operation: StringEnum(OPERATIONS, {
-		description:
-			"discover: connector names and tool counts, or one connector's tools when connector is set. find: search granted tools for a task. describe: input schema of one tool. invoke: call a tool. request: ask an admin for access.",
-	}),
-	connector: Type.Optional(
-		Type.String({
-			description: "For discover: list only this connector's tools. Omit for a summary of every connector.",
-		}),
-	),
-	task: Type.Optional(Type.String({ description: "For find: what you want to do. Omit to list all granted tools." })),
-	requestable: Type.Optional(
-		Type.Boolean({
-			description: "For find: show tools you do NOT have yet. Use only after a granted search returns nothing.",
-		}),
-	),
-	tool_name: Type.Optional(
-		Type.String({ description: "For describe and invoke: exact tool name from find or discover, shaped <connector>__<tool>." }),
-	),
+	operation: StringEnum(OPERATIONS),
+	connector: Type.Optional(Type.String()),
+	task: Type.Optional(Type.String({ description: "For find; omit to list all granted tools." })),
+	requestable: Type.Optional(Type.Boolean()),
+	tool_name: Type.Optional(Type.String()),
 	arguments: Type.Optional(
 		Type.Union([Type.Object({}, { additionalProperties: true }), Type.String()], {
-			description: "For invoke: the tool's arguments as an object. Read the schema with describe first.",
+			description: "For invoke; a string must encode a JSON object.",
 		}),
 	),
-	tool_names: Type.Optional(
-		Type.Array(Type.String(), { description: "For request: exact names from find with requestable true." }),
-	),
-	reason: Type.Optional(Type.String({ description: "For request: why you need it. The admin reads this verbatim." })),
+	tool_names: Type.Optional(Type.Array(Type.String())),
+	reason: Type.Optional(Type.String({ description: "For request; the admin reads this verbatim." })),
 });
 
 export default function mem0Gateway(pi: ExtensionAPI, _ctx: ExtensionContext) {

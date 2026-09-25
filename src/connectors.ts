@@ -59,5 +59,5 @@ export function describeConnectors(base: string, connectors: string[]): string {
 	const shown = connectors.slice(0, MAX_NAMES).join(", ");
 	const rest = connectors.length - MAX_NAMES;
 	const names = rest > 0 ? `${shown}, and ${rest} more` : shown;
-	return `${base} Connected apps seen in an earlier session: ${names}. Treat that as a hint about what to ask for, not as the current grant: 'discover' and 'find' remain the only authority.`;
+	return `${base}\n\nPreviously seen apps (not a current grant): ${names}. Use 'find' or 'discover' to check what is available now.`;
 }

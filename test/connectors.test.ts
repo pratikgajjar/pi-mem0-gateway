@@ -86,11 +86,10 @@ test("no names leaves the description untouched", () => {
 	assert.equal(describeConnectors("Base.", []), "Base.");
 });
 
-test("names are appended with a staleness warning", () => {
-	const out = describeConnectors("Base.", ["linear", "sentry"]);
-	assert.match(out, /linear, sentry/);
-	assert.match(out, /hint/i);
-	assert.match(out, /'discover' and 'find' remain the only authority/);
+test("names follow the usage guide as a separate, stale hint", () => {
+	const out = describeConnectors('Usage:\n  mem0_gateway({ operation: "find" })', ["linear", "sentry"]);
+	assert.match(out, /find" \}\)\n\nPreviously seen apps \(not a current grant\): linear, sentry\./);
+	assert.match(out, /Use 'find' or 'discover' to check what is available now/);
 });
 
 test("a long list is capped", () => {

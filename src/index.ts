@@ -61,8 +61,22 @@ type GatewayToolResult = {
 	details: GatewayDetails;
 };
 
-const BASE_DESCRIPTION =
-	"Reach this organization's external tools (issue trackers, docs, analytics, monitoring, and any other connected MCP server or API) through the mem0 gateway. The gateway holds the credentials and audits every call, so never ask the user to log in or for an API key. The granted set differs per org and changes while you work, so run 'discover' or 'find' to learn what exists instead of assuming, and run 'find' again after an access request or when the user says something changed. Normal path is 'find' for a task, then 'describe' for the schema, then 'invoke'. An empty find result is a confirmed no-match now, not an error and not permanent.";
+const BASE_DESCRIPTION = `Reach this organization's connected external tools through the mem0 gateway.
+The gateway holds credentials and audits calls; do not ask for a connector login or API key.
+
+Usage:
+  mem0_gateway({ operation: "find", task: "what you want to do" }) → Search granted tools for a task
+  mem0_gateway({ operation: "describe", tool_name: "<connector>__<tool>" }) → Read its input schema
+  mem0_gateway({ operation: "invoke", tool_name: "<connector>__<tool>", arguments: { ... } }) → Call it
+  mem0_gateway({ operation: "discover" }) → List connector names and tool counts
+  mem0_gateway({ operation: "discover", connector: "name" }) → List that connector's tools
+  mem0_gateway({ operation: "find", task: "what you need", requestable: true }) → Find ungranted tools
+  mem0_gateway({ operation: "request", tool_names: ["<name>"], reason: "why" }) → Request access
+
+Start with find; describe before invoke unless find already attached the schema. Only search
+requestable tools after a granted search returns nothing. Grants vary by org and can change
+during a session: find again after an access request or when the user says they changed.
+An empty find result means no match now, not a permanent lack of capability.`;
 
 const parameters = Type.Object({
 	operation: StringEnum(OPERATIONS, {

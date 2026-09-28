@@ -27,19 +27,18 @@ interface GatewayDetails {
 	failed: boolean;
 }
 
-/** Env opt-out for unattended runs. Set before pi starts, so the model cannot reach it. */
-const ALLOW_DESTRUCTIVE = "MEM0_GATEWAY_ALLOW_DESTRUCTIVE";
+/** Opt out of local write prompts at startup, never through a model-callable argument. */
+const AUTO_APPROVE_DESTRUCTIVE = process.env.MEM0_GATEWAY_ALLOW_DESTRUCTIVE === "1";
 
-/**
- * Approve a destructive call, or refuse it.
- *
- * A dialog is the only approval the model cannot give itself, so an
- * interactive session always asks. Without a UI there is no one to ask, so the
- * call is refused unless the environment already allowed it.
- */
-function approveDestructive(ctx: ExtensionContext, params: OperationParams): ApproveDestructive {
+/** A startup opt-in bypasses the dialog; otherwise interactive sessions ask and headless ones refuse. */
+export function approveDestructive(
+	ctx: ExtensionContext,
+	params: OperationParams,
+	allowDestructive = AUTO_APPROVE_DESTRUCTIVE,
+): ApproveDestructive {
 	return async (toolName) => {
-		if (!ctx.hasUI) return process.env[ALLOW_DESTRUCTIVE] === "1";
+		if (allowDestructive) return true;
+		if (!ctx.hasUI) return false;
 		return ctx.ui.confirm(
 			`Run ${toolName}?`,
 			`This writes through the mem0 gateway and other people see the change.\n\n${describeArguments(params)}`,
@@ -129,7 +128,7 @@ export default function mem0Gateway(pi: ExtensionAPI, _ctx: ExtensionContext) {
 			"Run mem0_gateway 'find' before any CLI, npx command, or other MCP server for an external system, and before concluding a capability does not exist; one gateway call replaces the install, login, and flag discovery that a CLI needs, and the granted set changes during a session.",
 			"With mem0_gateway, read a tool's schema with operation 'describe' before the first 'invoke' of that tool, unless a schema is already attached to the find result or to a failed invoke.",
 			"When mem0_gateway denies a call, read the attached note first: it says whether the tool name is misspelled or the grant is missing. Request access only when the grant is missing, and never work around a denial.",
-			"mem0_gateway asks the user before a destructive call and refuses it when no one can answer; report that refusal with what the call would change instead of retrying it.",
+			"Unless MEM0_GATEWAY_ALLOW_DESTRUCTIVE=1 was set before Pi started, mem0_gateway asks before destructive calls (or refuses without a UI); report a refusal instead of retrying it.",
 		],
 		parameters,
 

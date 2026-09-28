@@ -116,8 +116,8 @@ export function refusalText(toolName: string, args: Record<string, unknown>): st
 		JSON.stringify(args.arguments ?? args, null, 2),
 		"",
 		"Report this to the user with what it would change and who would see it.",
-		"An interactive session asks the user directly. A non-interactive one needs",
-		"MEM0_GATEWAY_ALLOW_DESTRUCTIVE=1 in the environment before pi starts.",
+		"An interactive session can ask the user directly. For either mode, restart Pi with",
+		"MEM0_GATEWAY_ALLOW_DESTRUCTIVE=1 to skip the extension's approval prompt.",
 	].join("\n");
 }
 

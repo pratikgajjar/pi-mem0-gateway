@@ -56,12 +56,12 @@ Use another path only when both the granted and the requestable search are empty
 
 A destructive tool writes to a system other people read: a comment notifies an assignee, an edit changes a shared record.
 
-The extension holds these for approval, and you cannot approve one:
+The extension handles approval outside the model; you cannot approve a call:
 
-- With a UI, the user sees a dialog with your exact arguments. Write arguments that state what will change.
-- Without a UI, the call is refused unless `MEM0_GATEWAY_ALLOW_DESTRUCTIVE=1` was set before pi started.
+- By default, a UI shows a dialog with the exact arguments. Without a UI, the call is refused.
+- If the user started Pi with `MEM0_GATEWAY_ALLOW_DESTRUCTIVE=1`, the extension skips its dialog in **both** modes. This opt-in applies to all destructive tools in that process; it does not override gateway grants.
 
-After a refusal, stop. Say what the call would change and who would see it, then give the two options: run it interactively, or start pi with that variable. Do not retry with different parameters.
+After a refusal, stop. Say what the call would change and who would see it, then give the options: approve in an interactive session, or restart Pi with that variable. Do not retry with different parameters.
 
 # Other errors
 

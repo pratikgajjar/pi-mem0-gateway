@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { GatewayConfig } from "../src/client.ts";
+import { approveDestructive } from "../src/index.ts";
 import { resetRiskCache, riskOf } from "../src/enrich.ts";
 import { refusalText, run } from "../src/operations.ts";
 
@@ -51,6 +53,36 @@ test("the refusal shows the exact arguments, so the user approves a change and n
 	assert.match(text, /"issueId": "X-1"/);
 	assert.match(text, /"body": "hi"/);
 	assert.match(text, /MEM0_GATEWAY_ALLOW_DESTRUCTIVE=1/);
+});
+
+test("startup opt-in skips the interactive dialog and invokes a destructive tool", async () => {
+	const stub = stubFetch({ describe_tool: { text: destructive }, invoke: { text: "posted" } });
+	let prompts = 0;
+	const ctx = { hasUI: true, ui: { confirm: async () => { prompts++; return false; } } } as unknown as ExtensionContext;
+	try {
+		const { result } = await run(
+			{ operation: "invoke", tool_name: "t__write", arguments: { body: "hello" } },
+			config,
+			undefined,
+			approveDestructive(ctx, { operation: "invoke", tool_name: "t__write", arguments: { body: "hello" } }, true),
+		);
+		assert.equal(result.isError, false);
+		assert.equal(prompts, 0);
+		assert.ok(stub.calls.includes("invoke"));
+	} finally {
+		stub.restore();
+	}
+});
+
+test("without opt-in interactive sessions still ask, and headless sessions refuse", async () => {
+	let prompts = 0;
+	const ctx = { hasUI: true, ui: { confirm: async () => { prompts++; return false; } } } as unknown as ExtensionContext;
+	const params = { operation: "invoke" as const, tool_name: "t__write", arguments: { body: "hello" } };
+	assert.equal(await approveDestructive(ctx, params, false)("t__write", {}), false);
+	assert.equal(prompts, 1);
+	assert.equal(await approveDestructive({ hasUI: false } as ExtensionContext, params, false)("t__write", {}), false);
+	assert.equal(prompts, 1);
+	assert.equal(await approveDestructive({ hasUI: false } as ExtensionContext, params, true)("t__write", {}), true);
 });
 
 test("an approved destructive call goes through", async () => {

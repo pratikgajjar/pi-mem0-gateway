@@ -70,12 +70,18 @@ An empty `find` result is a confirmed no-match rather than an error. When a gran
 
 The gateway classifies each tool. A `destructive` tool writes to a system other people read: a comment notifies an assignee, an edit changes a shared record.
 
-| Session | Behaviour |
-|---|---|
-| Interactive | A dialog shows the exact arguments and waits for approval |
-| Non-interactive | Refused, unless `MEM0_GATEWAY_ALLOW_DESTRUCTIVE=1` is set before pi starts |
+| Startup setting | Interactive | Non-interactive |
+|---|---|---|
+| Default | Dialog shows the exact arguments and waits for approval | Refused |
+| `MEM0_GATEWAY_ALLOW_DESTRUCTIVE=1` | No dialog; invoke immediately | Invoke immediately |
 
-Approval is held outside the model: a dialog, or an environment variable fixed before the process starts. A parameter the model can set is not a gate.
+To opt out of local approval prompts, set the flag **before starting pi**:
+
+```bash
+MEM0_GATEWAY_ALLOW_DESTRUCTIVE=1 pi
+```
+
+This opt-in applies to every connector's `destructive` tool for the entire process; the model may make writes without asking you. Use only when you trust the agent to write on your behalf. It does **not** grant access to ungranted tools or bypass approvals required by the gateway or connected service. Unset the flag to restore prompts. The flag is captured at extension load, not exposed as a tool argument.
 
 Reads are never gated. A tool's risk is read once per process, so a normal call still costs one request.
 

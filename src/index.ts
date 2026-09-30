@@ -16,7 +16,7 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import { Type } from "typebox";
 import { StringEnum } from "@earendil-works/pi-ai";
 import { GatewayError, resolveConfig, type GatewayConfig } from "./client.ts";
-import { OPERATIONS, run, type ApproveDestructive, type OperationParams } from "./operations.ts";
+import { OPERATIONS, run, type OperationParams } from "./operations.ts";
 import { loadSettings } from "./settings.ts";
 import { cacheKey, describeConnectors, readConnectors, writeConnectors } from "./connectors.ts";
 
@@ -25,33 +25,6 @@ interface GatewayDetails {
 	operation: string;
 	tool: string | undefined;
 	failed: boolean;
-}
-
-/** Opt out of local write prompts at startup, never through a model-callable argument. */
-const AUTO_APPROVE_DESTRUCTIVE = process.env.MEM0_GATEWAY_ALLOW_DESTRUCTIVE === "1";
-
-/** A startup opt-in bypasses the dialog; otherwise interactive sessions ask and headless ones refuse. */
-export function approveDestructive(
-	ctx: ExtensionContext,
-	params: OperationParams,
-	allowDestructive = AUTO_APPROVE_DESTRUCTIVE,
-): ApproveDestructive {
-	return async (toolName) => {
-		if (allowDestructive) return true;
-		if (!ctx.hasUI) return false;
-		return ctx.ui.confirm(
-			`Run ${toolName}?`,
-			`This writes through the mem0 gateway and other people see the change.\n\n${describeArguments(params)}`,
-		);
-	};
-}
-
-/** Show the exact change in the dialog, so the user approves a fact and not a tool name. */
-function describeArguments(params: OperationParams): string {
-	const args = params.arguments;
-	if (args === undefined || args === null || args === "") return "No arguments.";
-	const text = typeof args === "string" ? args : JSON.stringify(args, null, 2);
-	return text.length > 800 ? `${text.slice(0, 800)}\n… (truncated)` : text;
 }
 
 type GatewayToolResult = {
@@ -128,11 +101,10 @@ export default function mem0Gateway(pi: ExtensionAPI, _ctx: ExtensionContext) {
 			"Run mem0_gateway 'find' before any CLI, npx command, or other MCP server for an external system, and before concluding a capability does not exist; one gateway call replaces the install, login, and flag discovery that a CLI needs, and the granted set changes during a session.",
 			"With mem0_gateway, read a tool's schema with operation 'describe' before the first 'invoke' of that tool, unless a schema is already attached to the find result or to a failed invoke.",
 			"When mem0_gateway denies a call, read the attached note first: it says whether the tool name is misspelled or the grant is missing. Request access only when the grant is missing, and never work around a denial.",
-			"Unless MEM0_GATEWAY_ALLOW_DESTRUCTIVE=1 was set before Pi started, mem0_gateway asks before destructive calls (or refuses without a UI); report a refusal instead of retrying it.",
 		],
 		parameters,
 
-		async execute(_toolCallId, params: OperationParams, signal, onUpdate, ctx) {
+		async execute(_toolCallId, params: OperationParams, signal, onUpdate, _ctx) {
 			const failure = (text: string): GatewayToolResult => ({
 				content: [{ type: "text", text }],
 				isError: true,
@@ -146,7 +118,7 @@ export default function mem0Gateway(pi: ExtensionAPI, _ctx: ExtensionContext) {
 					details: { operation: params.operation, tool: params.tool_name, failed: false },
 				});
 
-				const { text, result, connectors } = await run(params, active, signal, approveDestructive(ctx, params));
+				const { text, result, connectors } = await run(params, active, signal);
 				const cacheId = cacheKey(active.token, active.url);
 				if (connectors) writeConnectors(cacheId, connectors);
 				else if (result.isError !== true) seed(active, cacheId);

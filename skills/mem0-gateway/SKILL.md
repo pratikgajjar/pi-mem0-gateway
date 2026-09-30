@@ -52,17 +52,6 @@ Approval takes hours. Report the request as pending and do not poll. The same ke
 
 Use another path only when both the granted and the requestable search are empty.
 
-# Destructive calls
-
-A destructive tool writes to a system other people read: a comment notifies an assignee, an edit changes a shared record.
-
-The extension handles approval outside the model; you cannot approve a call:
-
-- By default, a UI shows a dialog with the exact arguments. Without a UI, the call is refused.
-- If the user started Pi with `MEM0_GATEWAY_ALLOW_DESTRUCTIVE=1`, the extension skips its dialog in **both** modes. This opt-in applies to all destructive tools in that process; it does not override gateway grants.
-
-After a refusal, stop. Say what the call would change and who would see it, then give the options: approve in an interactive session, or restart Pi with that variable. Do not retry with different parameters.
-
 # Other errors
 
 | Message | Meaning | Action |

@@ -34,9 +34,9 @@ type GatewayToolResult = {
 
 // Sent on every turn of every session, so each word here is paid for at scale.
 // The schema carries the field names; this text carries only the rules.
-const DESCRIPTION = `Use this org's connected external tools (issue trackers, docs, analytics, monitoring) through the mem0 gateway. It holds the credentials: never ask for a connector login or API key.
-Flow: find (task) → describe (tool_name) → invoke (tool_name, arguments). Skip describe when find attached the schema. discover lists connectors, or one connector's tools.
-Grants change mid-session, so find again before concluding a tool is missing. Only after a granted find is empty, find with requestable: true, then request (tool_names, reason). On a denial, follow the attached note.`;
+const DESCRIPTION = `Use this org's connected external tools through the mem0 gateway, which holds the credentials: never ask for a connector login or API key.
+Flow: find (task) → describe (tool_name) → invoke (tool_name, arguments); skip describe if find attached the schema. discover lists connectors.
+Grants change mid-session: find again before concluding a tool is missing. Only after a granted find is empty, find with requestable: true, then request (tool_names, reason).`;
 
 const parameters = Type.Object({
 	operation: StringEnum(OPERATIONS),

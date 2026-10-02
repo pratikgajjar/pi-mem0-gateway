@@ -6,7 +6,7 @@
 
 import { GatewayError, callTool, resultText, type GatewayConfig, type ToolResult } from "./client.ts";
 import { attachSchemaForSingleMatch, explainInvokeFailure } from "./enrich.ts";
-import { connectorNames, filterInventory } from "./inventory.ts";
+import { filterInventory } from "./inventory.ts";
 
 export const OPERATIONS = ["discover", "find", "describe", "invoke", "request"] as const;
 export type Operation = (typeof OPERATIONS)[number];
@@ -93,7 +93,7 @@ export async function run(
 	params: OperationParams,
 	config: GatewayConfig,
 	signal?: AbortSignal,
-): Promise<{ text: string; result: ToolResult; connectors?: string[] }> {
+): Promise<{ text: string; result: ToolResult }> {
 	const { name, args } = planCall(params);
 
 	const result = await callTool(name, args, config, signal);
@@ -108,10 +108,8 @@ export async function run(
 		return { text: await attachSchemaForSingleMatch(text, config, signal), result };
 	}
 	if (result.isError !== true && params.operation === "discover") {
-		// Names come from the unfiltered reply, so a filtered call still caches the full set.
-		const connectors = connectorNames(text);
 		const filtered = filterInventory(text, params.connector);
-		return { text: filtered, result: { ...result, content: [{ type: "text", text: filtered }] }, connectors };
+		return { text: filtered, result: { ...result, content: [{ type: "text", text: filtered }] } };
 	}
 	return { text, result };
 }

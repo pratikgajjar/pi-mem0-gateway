@@ -18,7 +18,6 @@ import { StringEnum } from "@earendil-works/pi-ai";
 import { GatewayError, resolveConfig, type GatewayConfig } from "./client.ts";
 import { OPERATIONS, run, type OperationParams } from "./operations.ts";
 import { loadSettings } from "./settings.ts";
-import { cacheKey, describeConnectors, readConnectors, writeConnectors } from "./connectors.ts";
 
 /** What the TUI and the session transcript keep for each call. No arguments, so no secrets. */
 interface GatewayDetails {
@@ -33,36 +32,21 @@ type GatewayToolResult = {
 	details: GatewayDetails;
 };
 
-const BASE_DESCRIPTION = `Reach this organization's connected external tools through the mem0 gateway.
-The gateway holds credentials and audits calls; do not ask for a connector login or API key.
-
-Usage:
-  mem0_gateway({ operation: "find", task: "what you want to do" }) → Search granted tools for a task
-  mem0_gateway({ operation: "describe", tool_name: "<connector>__<tool>" }) → Read its input schema
-  mem0_gateway({ operation: "invoke", tool_name: "<connector>__<tool>", arguments: { ... } }) → Call it
-  mem0_gateway({ operation: "discover" }) → List connector names and tool counts
-  mem0_gateway({ operation: "discover", connector: "name" }) → List that connector's tools
-  mem0_gateway({ operation: "find", task: "what you need", requestable: true }) → Find ungranted tools
-  mem0_gateway({ operation: "request", tool_names: ["<name>"], reason: "why" }) → Request access
-
-Start with find; describe before invoke unless find already attached the schema. Only search
-requestable tools after a granted search returns nothing. Grants vary by org and can change
-during a session: find again after an access request or when the user says they changed.
-An empty find result means no match now, not a permanent lack of capability.`;
+// Sent on every turn of every session, so each word here is paid for at scale.
+// The schema carries the field names; this text carries only the rules.
+const DESCRIPTION = `Use this org's connected external tools (issue trackers, docs, analytics, monitoring) through the mem0 gateway. It holds the credentials: never ask for a connector login or API key.
+Flow: find (task) → describe (tool_name) → invoke (tool_name, arguments). Skip describe when find attached the schema. discover lists connectors, or one connector's tools.
+Grants change mid-session, so find again before concluding a tool is missing. Only after a granted find is empty, find with requestable: true, then request (tool_names, reason). On a denial, follow the attached note.`;
 
 const parameters = Type.Object({
 	operation: StringEnum(OPERATIONS),
 	connector: Type.Optional(Type.String()),
-	task: Type.Optional(Type.String({ description: "For find; omit to list all granted tools." })),
+	task: Type.Optional(Type.String()),
 	requestable: Type.Optional(Type.Boolean()),
 	tool_name: Type.Optional(Type.String()),
-	arguments: Type.Optional(
-		Type.Union([Type.Object({}, { additionalProperties: true }), Type.String()], {
-			description: "For invoke; a string must encode a JSON object.",
-		}),
-	),
+	arguments: Type.Optional(Type.Union([Type.Object({}, { additionalProperties: true }), Type.String()])),
 	tool_names: Type.Optional(Type.Array(Type.String())),
-	reason: Type.Optional(Type.String({ description: "For request; the admin reads this verbatim." })),
+	reason: Type.Optional(Type.String()),
 });
 
 export default function mem0Gateway(pi: ExtensionAPI, _ctx: ExtensionContext) {
@@ -71,37 +55,12 @@ export default function mem0Gateway(pi: ExtensionAPI, _ctx: ExtensionContext) {
 	let cached: GatewayConfig | undefined;
 	const config = (): GatewayConfig => (cached ??= resolveConfig(loadSettings()));
 
-	// No key means no remembered names, and no reason to fail the load.
-	const key = (): string | undefined => {
-		try {
-			const active = config();
-			return cacheKey(active.token, active.url);
-		} catch {
-			return undefined;
-		}
-	};
-
-	// discover writes the names, but the promoted path is find. Seed once, in the
-	// background, with no signal: an ending turn must not cancel the write.
-	let seeded = false;
-	const seed = (active: GatewayConfig, cacheId: string): void => {
-		if (seeded || readConnectors(cacheId).length > 0) return;
-		seeded = true;
-		void run({ operation: "discover" }, active)
-			.then(({ connectors }) => connectors?.length && writeConnectors(cacheId, connectors))
-			.catch(() => {});
-	};
-
 	pi.registerTool({
 		name: "mem0_gateway",
 		label: "mem0 gateway",
-		description: describeConnectors(BASE_DESCRIPTION, readConnectors(key())),
-		promptSnippet: "Reach this org's connected external tools through the mem0 gateway",
-		promptGuidelines: [
-			"Run mem0_gateway 'find' before any CLI, npx command, or other MCP server for an external system, and before concluding a capability does not exist; one gateway call replaces the install, login, and flag discovery that a CLI needs, and the granted set changes during a session.",
-			"With mem0_gateway, read a tool's schema with operation 'describe' before the first 'invoke' of that tool, unless a schema is already attached to the find result or to a failed invoke.",
-			"When mem0_gateway denies a call, read the attached note first: it says whether the tool name is misspelled or the grant is missing. Request access only when the grant is missing, and never work around a denial.",
-		],
+		description: DESCRIPTION,
+		promptSnippet: "Use this org's connected external tools through the mem0 gateway",
+		promptGuidelines: ["For an external system, run mem0_gateway find before reaching for a CLI or another MCP server."],
 		parameters,
 
 		async execute(_toolCallId, params: OperationParams, signal, onUpdate, _ctx) {
@@ -118,10 +77,7 @@ export default function mem0Gateway(pi: ExtensionAPI, _ctx: ExtensionContext) {
 					details: { operation: params.operation, tool: params.tool_name, failed: false },
 				});
 
-				const { text, result, connectors } = await run(params, active, signal);
-				const cacheId = cacheKey(active.token, active.url);
-				if (connectors) writeConnectors(cacheId, connectors);
-				else if (result.isError !== true) seed(active, cacheId);
+				const { text, result } = await run(params, active, signal);
 				return {
 					content: [{ type: "text", text }],
 					isError: result.isError === true,
